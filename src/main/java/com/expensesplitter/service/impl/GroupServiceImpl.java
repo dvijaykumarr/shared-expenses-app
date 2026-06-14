@@ -1,0 +1,54 @@
+package com.expensesplitter.service.impl;
+
+import com.expensesplitter.mapper.GroupMapper;
+import com.expensesplitter.model.Group;
+import com.expensesplitter.model.GroupMember;
+import com.expensesplitter.model.User;
+import com.expensesplitter.repository.GroupMemberRepository;
+import com.expensesplitter.repository.GroupRepository;
+import com.expensesplitter.repository.UserRepository;
+import com.expensesplitter.request.GroupRequest;
+import com.expensesplitter.response.GroupResponse;
+import com.expensesplitter.service.GroupService;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class GroupServiceImpl implements GroupService {
+
+    private final GroupRepository groupRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final UserRepository userRepository;
+    private final GroupMapper groupMapper;
+
+    @Override
+    @Transactional
+    public GroupResponse createGroup(GroupRequest request) {
+
+        User currentUser = userRepository.findById(request.getCreatedBy())
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        Group group = groupMapper.toEntity(request);
+
+        group.setCreatedAt(LocalDateTime.now());
+
+        Group savedGroup = groupRepository.save(group);
+
+        GroupMember groupMember = GroupMember.builder()
+                .group(savedGroup)
+                .user(currentUser)
+                .joinedAt(LocalDate.now())
+                .active(true)
+                .build();
+
+        groupMemberRepository.save(groupMember);
+
+        return groupMapper.toResponse(savedGroup);
+    }
+}
