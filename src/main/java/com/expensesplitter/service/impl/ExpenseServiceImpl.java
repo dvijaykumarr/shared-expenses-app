@@ -6,6 +6,7 @@ import com.expensesplitter.repository.*;
 import com.expensesplitter.request.CreateExpenseRequest;
 import com.expensesplitter.response.BalanceResponse;
 import com.expensesplitter.response.ExpenseResponse;
+import com.expensesplitter.response.SettlementResponse;
 import com.expensesplitter.service.ExpenseService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -164,5 +165,99 @@ public class ExpenseServiceImpl implements ExpenseService {
         }
 
         return responses;
+    }
+
+    @Override
+    public List<SettlementResponse> simplifyBalances(
+            Long groupId
+    ) {
+
+        List<BalanceResponse> balances =
+                getGroupBalances(groupId);
+
+        List<BalanceResponse> creditors =
+                new ArrayList<>();
+
+        List<BalanceResponse> debtors =
+                new ArrayList<>();
+
+        for (BalanceResponse balance : balances) {
+
+            if (balance.getBalance()
+                    .compareTo(BigDecimal.ZERO) > 0) {
+
+                creditors.add(balance);
+
+            } else if (balance.getBalance()
+                    .compareTo(BigDecimal.ZERO) < 0) {
+
+                debtors.add(balance);
+            }
+        }
+
+        List<SettlementResponse> settlements =
+                new ArrayList<>();
+
+        int i = 0;
+        int j = 0;
+
+        while (i < debtors.size() &&
+                j < creditors.size()) {
+
+            BalanceResponse debtor =
+                    debtors.get(i);
+
+            BalanceResponse creditor =
+                    creditors.get(j);
+
+            BigDecimal debtAmount =
+                    debtor.getBalance().abs();
+
+            BigDecimal creditAmount =
+                    creditor.getBalance();
+
+            BigDecimal settledAmount =
+                    debtAmount.min(creditAmount);
+
+            settlements.add(
+                    new SettlementResponse(
+                            debtor.getName(),
+                            creditor.getName(),
+                            settledAmount
+                    )
+            );
+
+            debtor = new BalanceResponse(
+                    debtor.getUserId(),
+                    debtor.getName(),
+                    debtor.getBalance()
+                            .add(settledAmount)
+            );
+
+            creditor = new BalanceResponse(
+                    creditor.getUserId(),
+                    creditor.getName(),
+                    creditor.getBalance()
+                            .subtract(settledAmount)
+            );
+
+            debtors.set(i, debtor);
+
+            creditors.set(j, creditor);
+
+            if (debtor.getBalance()
+                    .compareTo(BigDecimal.ZERO) == 0) {
+
+                i++;
+            }
+
+            if (creditor.getBalance()
+                    .compareTo(BigDecimal.ZERO) == 0) {
+
+                j++;
+            }
+        }
+
+        return settlements;
     }
 }

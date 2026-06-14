@@ -3,6 +3,7 @@ package com.expensesplitter.controller;
 import com.expensesplitter.request.CreateExpenseRequest;
 import com.expensesplitter.response.BalanceResponse;
 import com.expensesplitter.response.ExpenseResponse;
+import com.expensesplitter.response.SettlementResponse;
 import com.expensesplitter.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -30,5 +31,13 @@ public class ExpenseController {
     ) {
 
         return expenseService.getGroupBalances(groupId);
+    }
+
+    @GetMapping("/groups/{groupId}/settlements")
+    public List<SettlementResponse> simplifyBalances(
+            @PathVariable Long groupId
+    ) {
+
+        return expenseService.simplifyBalances(groupId);
     }
 }
