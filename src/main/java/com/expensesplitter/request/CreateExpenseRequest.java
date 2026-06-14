@@ -31,5 +31,6 @@ public class CreateExpenseRequest {
 
     private Long groupId;
 
-    private List<Long> participantIds;
+    private List<ExpenseParticipantRequest> participants;
+
 }

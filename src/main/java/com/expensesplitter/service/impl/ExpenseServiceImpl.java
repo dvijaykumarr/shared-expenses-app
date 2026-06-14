@@ -4,6 +4,7 @@ import com.expensesplitter.mapper.ExpenseMapper;
 import com.expensesplitter.model.*;
 import com.expensesplitter.repository.*;
 import com.expensesplitter.request.CreateExpenseRequest;
+import com.expensesplitter.request.ExpenseParticipantRequest;
 import com.expensesplitter.response.BalanceResponse;
 import com.expensesplitter.response.ExpenseResponse;
 import com.expensesplitter.response.SettlementResponse;
@@ -58,8 +59,150 @@ public class ExpenseServiceImpl implements ExpenseService {
         Expense savedExpense =
                 expenseRepository.save(expense);
 
+        switch (request.getSplitType()) {
+
+            case EQUAL -> handleEqualSplit(
+                    request,
+                    savedExpense,
+                    normalizedAmount
+            );
+
+            case EXACT -> handleExactSplit(
+                    request,
+                    savedExpense
+            );
+
+            case PERCENTAGE -> handlePercentageSplit(
+                    request,
+                    savedExpense,
+                    normalizedAmount
+            );
+        }
+
+        return expenseMapper.toResponse(savedExpense);
+    }
+
+    private void handlePercentageSplit(
+            CreateExpenseRequest request,
+            Expense expense,
+            BigDecimal normalizedAmount
+    ) {
+
+        BigDecimal totalPercentage =
+                BigDecimal.ZERO;
+
+        for (ExpenseParticipantRequest participantRequest
+                : request.getParticipants()) {
+
+            totalPercentage =
+                    totalPercentage.add(
+                            participantRequest.getPercentage()
+                    );
+        }
+
+        if (totalPercentage.compareTo(
+                BigDecimal.valueOf(100)
+        ) != 0) {
+
+            throw new RuntimeException(
+                    "Total percentage must equal 100"
+            );
+        }
+
+        for (ExpenseParticipantRequest participantRequest
+                : request.getParticipants()) {
+
+            User participant =
+                    userRepository.findById(
+                                    participantRequest.getUserId()
+                            )
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Participant not found"
+                                    ));
+
+            BigDecimal shareAmount =
+                    normalizedAmount.multiply(
+                            participantRequest.getPercentage()
+                                    .divide(
+                                            BigDecimal.valueOf(100),
+                                            2,
+                                            RoundingMode.HALF_UP
+                                    )
+                    );
+
+            ExpenseParticipant expenseParticipant =
+                    ExpenseParticipant.builder()
+                            .expense(expense)
+                            .user(participant)
+                            .shareAmount(shareAmount)
+                            .percentage(
+                                    participantRequest.getPercentage()
+                            )
+                            .build();
+
+            participantRepository.save(expenseParticipant);
+        }
+    }
+
+    private void handleExactSplit(
+            CreateExpenseRequest request,
+            Expense expense
+    ) {
+
+        BigDecimal total =
+                BigDecimal.ZERO;
+
+        for (ExpenseParticipantRequest participantRequest
+                : request.getParticipants()) {
+
+            total = total.add(
+                    participantRequest.getShareAmount()
+            );
+        }
+
+        if (total.compareTo(
+                expense.getNormalizedAmount()
+        ) != 0) {
+
+            throw new RuntimeException(
+                    "Exact split total does not match expense amount"
+            );
+        }
+
+        for (ExpenseParticipantRequest participantRequest
+                : request.getParticipants()) {
+
+            User participant =
+                    userRepository.findById(
+                                    participantRequest.getUserId()
+                            )
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Participant not found"
+                                    ));
+
+            ExpenseParticipant expenseParticipant =
+                    ExpenseParticipant.builder()
+                            .expense(expense)
+                            .user(participant)
+                            .shareAmount(
+                                    participantRequest.getShareAmount()
+                            )
+                            .build();
+
+            participantRepository.save(expenseParticipant);
+        }
+    }
+
+    private void handleEqualSplit(
+            CreateExpenseRequest request,
+            Expense expense,
+            BigDecimal normalizedAmount
+    ) {
+
         int participantCount =
-                request.getParticipantIds().size();
+                request.getParticipants().size();
 
         BigDecimal splitAmount =
                 normalizedAmount.divide(
@@ -68,10 +211,13 @@ public class ExpenseServiceImpl implements ExpenseService {
                         RoundingMode.HALF_UP
                 );
 
-        for (Long participantId : request.getParticipantIds()) {
+        for (ExpenseParticipantRequest participantRequest
+                : request.getParticipants()) {
 
             User participant =
-                    userRepository.findById(participantId)
+                    userRepository.findById(
+                                    participantRequest.getUserId()
+                            )
                             .orElseThrow(() ->
                                     new RuntimeException(
                                             "Participant not found"
@@ -79,15 +225,13 @@ public class ExpenseServiceImpl implements ExpenseService {
 
             ExpenseParticipant expenseParticipant =
                     ExpenseParticipant.builder()
-                            .expense(savedExpense)
+                            .expense(expense)
                             .user(participant)
                             .shareAmount(splitAmount)
                             .build();
 
             participantRepository.save(expenseParticipant);
         }
-
-        return expenseMapper.toResponse(savedExpense);
     }
 
     @Override
