@@ -1,6 +1,8 @@
 package com.expensesplitter.controller;
 
 import com.expensesplitter.dto.UserDTO;
+import com.expensesplitter.request.LoginRequest;
+import com.expensesplitter.response.AuthResponse;
 import com.expensesplitter.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,5 +22,11 @@ public class AuthController {
     public UserDTO register(@Valid @RequestBody UserDTO userDTO) {
 
         return authService.register(userDTO);
+    }
+
+    @PostMapping("/login")
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+
+        return authService.login(request);
     }
 }
