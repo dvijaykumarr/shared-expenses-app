@@ -7,6 +7,7 @@ import com.expensesplitter.model.User;
 import com.expensesplitter.repository.GroupMemberRepository;
 import com.expensesplitter.repository.GroupRepository;
 import com.expensesplitter.repository.UserRepository;
+import com.expensesplitter.request.AddMemberRequest;
 import com.expensesplitter.request.GroupRequest;
 import com.expensesplitter.response.GroupResponse;
 import com.expensesplitter.service.GroupService;
@@ -50,5 +51,44 @@ public class GroupServiceImpl implements GroupService {
         groupMemberRepository.save(groupMember);
 
         return groupMapper.toResponse(savedGroup);
+    }
+
+    @Override
+    @Transactional
+    public void addMember(
+            Long groupId,
+            AddMemberRequest request
+    ) {
+
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() ->
+                        new RuntimeException("Group not found"));
+
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        boolean alreadyMember =
+                groupMemberRepository
+                        .existsByGroupIdAndUserIdAndActiveTrue(
+                                groupId,
+                                request.getUserId()
+                        );
+
+        if (alreadyMember) {
+
+            throw new RuntimeException(
+                    "User is already an active member"
+            );
+        }
+
+        GroupMember groupMember = GroupMember.builder()
+                .group(group)
+                .user(user)
+                .joinedAt(LocalDate.now())
+                .active(true)
+                .build();
+
+        groupMemberRepository.save(groupMember);
     }
 }

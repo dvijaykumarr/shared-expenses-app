@@ -1,5 +1,6 @@
 package com.expensesplitter.controller;
 
+import com.expensesplitter.request.AddMemberRequest;
 import com.expensesplitter.request.GroupRequest;
 import com.expensesplitter.response.GroupResponse;
 import com.expensesplitter.service.GroupService;
@@ -20,5 +21,16 @@ public class GroupController {
     ) {
 
         return groupService.createGroup(request);
+    }
+
+    @PostMapping("/{groupId}/members")
+    public String addMember(
+            @PathVariable Long groupId,
+            @RequestBody AddMemberRequest request
+    ) {
+
+        groupService.addMember(groupId, request);
+
+        return "Member added successfully";
     }
 }
