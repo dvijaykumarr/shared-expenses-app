@@ -2,11 +2,13 @@ package com.expensesplitter.controller;
 
 import com.expensesplitter.request.AddMemberRequest;
 import com.expensesplitter.request.GroupRequest;
+import com.expensesplitter.response.GroupMemberResponse;
 import com.expensesplitter.response.GroupResponse;
 import com.expensesplitter.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/groups")
@@ -43,5 +45,13 @@ public class GroupController {
         groupService.removeMember(groupId, userId);
 
         return "Member removed successfully";
+    }
+
+    @GetMapping("/{groupId}/members")
+    public List<GroupMemberResponse> getGroupMembers(
+            @PathVariable Long groupId
+    ) {
+
+        return groupService.getGroupMembers(groupId);
     }
 }

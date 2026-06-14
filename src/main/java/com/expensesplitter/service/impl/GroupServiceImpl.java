@@ -9,6 +9,7 @@ import com.expensesplitter.repository.GroupRepository;
 import com.expensesplitter.repository.UserRepository;
 import com.expensesplitter.request.AddMemberRequest;
 import com.expensesplitter.request.GroupRequest;
+import com.expensesplitter.response.GroupMemberResponse;
 import com.expensesplitter.response.GroupResponse;
 import com.expensesplitter.service.GroupService;
 import jakarta.transaction.Transactional;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -116,4 +118,24 @@ public class GroupServiceImpl implements GroupService {
 
         groupMemberRepository.save(groupMember);
     }
+
+    @Override
+    public List<GroupMemberResponse> getGroupMembers(Long groupId) {
+        List<GroupMember> members =
+                groupMemberRepository.findByGroupId(groupId);
+
+        return members.stream()
+                .map(member ->
+                        GroupMemberResponse.builder()
+                                .userId(member.getUser().getId())
+                                .name(member.getUser().getName())
+                                .joinedAt(member.getJoinedAt())
+                                .leftAt(member.getLeftAt())
+                                .active(member.isActive())
+                                .build()
+                )
+                .toList();
+    }
+
+
 }
