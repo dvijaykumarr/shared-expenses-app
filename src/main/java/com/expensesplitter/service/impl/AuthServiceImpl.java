@@ -6,12 +6,9 @@ import com.expensesplitter.model.User;
 import com.expensesplitter.repository.UserRepository;
 import com.expensesplitter.request.LoginRequest;
 import com.expensesplitter.response.AuthResponse;
-import com.expensesplitter.security.JwtService;
 import com.expensesplitter.service.AuthService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,10 +16,9 @@ import org.springframework.stereotype.Service;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final AuthenticationManager authenticationManager;
-    private final JwtService jwtService;
+
+
 
     @Override
     public UserDTO register(UserDTO userDTO) {
@@ -34,7 +30,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userMapper.toEntity(userDTO);
 
         user.setPassword(
-                passwordEncoder.encode(userDTO.getPassword())
+                BCrypt.hashpw(userDTO.getPassword(), BCrypt.gensalt())
         );
 
         User savedUser = userRepository.save(user);
@@ -45,15 +41,22 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
 
-        String token = jwtService.generateToken(request.getEmail());
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() ->
+                        new RuntimeException("Invalid email or password"));
 
-        return new AuthResponse(token);
+        boolean passwordMatches =
+                BCrypt.checkpw(
+                        request.getPassword(),
+                        user.getPassword()
+                );
+
+        if (!passwordMatches) {
+
+            throw new RuntimeException("Invalid email or password");
+        }
+
+        return new AuthResponse("Login successful");
     }
 }
