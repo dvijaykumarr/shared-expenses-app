@@ -1,8 +1,14 @@
 package com.expensesplitter.service.impl;
 
+import java.math.RoundingMode;
 import com.expensesplitter.enums.ImportStatus;
+import com.expensesplitter.repository.ExpenseParticipantRepository;
+import com.expensesplitter.repository.ExpenseRepository;
+import com.expensesplitter.repository.GroupRepository;
+import com.expensesplitter.repository.UserRepository;
 import com.expensesplitter.response.ImportRowResult;
 import com.expensesplitter.service.ImportService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -10,6 +16,13 @@ import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
+
+import com.expensesplitter.model.Expense;
+import com.expensesplitter.model.ExpenseParticipant;
+import com.expensesplitter.model.Group;
+import com.expensesplitter.model.User;
+import com.expensesplitter.enums.Currency;
+import com.expensesplitter.enums.SplitType;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -26,6 +39,13 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
 
+
+    private final ExpenseRepository expenseRepository;
+    private final ExpenseParticipantRepository participantRepository;
+    private final UserRepository userRepository;
+    private final GroupRepository groupRepository;
+
+    @Transactional
     @Override
     public List<ImportRowResult> importCSV(
             MultipartFile file
@@ -159,12 +179,15 @@ public class ImportServiceImpl implements ImportService {
                 String expenseDate =
                         record.get("date");
 
+                LocalDate parsedDate;
+
                 try {
 
                     DateTimeFormatter formatter =
-                            DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                            DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
-                    LocalDate.parse(expenseDate, formatter);
+                    parsedDate =
+                            LocalDate.parse(expenseDate, formatter);
 
                 } catch (DateTimeParseException e) {
 
@@ -353,13 +376,131 @@ public class ImportServiceImpl implements ImportService {
 
                 duplicateTracker.add(duplicateKey);
 
-                results.add(
-                        ImportRowResult.builder()
-                                .rowNumber(rowNumber)
-                                .status(ImportStatus.VALID)
-                                .message("Row is valid")
-                                .build()
-                );
+                try {
+
+                    User paidUser =
+                            userRepository.findByEmail(
+                                    paidBy.toLowerCase().trim()
+                            ).orElse(null);
+
+                    if (paidUser == null) {
+
+                        paidUser = User.builder()
+                                .name(
+                                        paidBy.split("@")[0]
+                                )
+                                .email(
+                                        paidBy.toLowerCase().trim()
+                                )
+                                .password("IMPORTED_USER")
+                                .build();
+
+                        paidUser =
+                                userRepository.save(paidUser);
+                    }
+
+                    Group defaultGroup =
+                            groupRepository.findById(1L)
+                                    .orElseThrow(() ->
+                                            new RuntimeException(
+                                                    "Default group not found"
+                                            ));
+
+                    BigDecimal parsedAmount =
+                            new BigDecimal(
+                                    amount.replace(",", "")
+                            );
+
+                    Expense expense =
+                            Expense.builder()
+                                    .title(description)
+                                    .description(description)
+                                    .amount(parsedAmount)
+                                    .normalizedAmount(parsedAmount)
+                                    .currency(
+                                            Currency.valueOf(
+                                                    currency.toUpperCase()
+                                            )
+                                    )
+                                    .exchangeRate(BigDecimal.ONE)
+                                    .splitType(SplitType.EQUAL)
+                                    .expenseDate(parsedDate)
+                                    .paidBy(paidUser)
+                                    .group(defaultGroup)
+                                    .build();
+
+                    Expense savedExpense =
+                            expenseRepository.save(expense);
+
+                    String[] participants =
+                            splitWith.split(",");
+
+                    BigDecimal splitAmount =
+                            parsedAmount.divide(
+                                    BigDecimal.valueOf(
+                                            participants.length
+                                    ),
+                                    2,
+                                    RoundingMode.HALF_UP
+                            );
+
+                    for (String participantName : participants) {
+
+                        User participant =
+                                userRepository.findByEmail(
+                                        participantName
+                                                .trim()
+                                                .toLowerCase()
+                                ).orElse(null);
+
+                        if (participant == null) {
+
+                            participant = User.builder()
+                                    .name(
+                                            participantName.split("@")[0]
+                                    )
+                                    .email(
+                                            participantName
+                                                    .trim()
+                                                    .toLowerCase()
+                                    )
+                                    .password("IMPORTED_USER")
+                                    .build();
+
+                            participant =
+                                    userRepository.save(participant);
+                        }
+
+                        ExpenseParticipant expenseParticipant =
+                                ExpenseParticipant.builder()
+                                        .expense(savedExpense)
+                                        .user(participant)
+                                        .shareAmount(splitAmount)
+                                        .build();
+
+                        participantRepository.save(
+                                expenseParticipant
+                        );
+                    }
+
+                    results.add(
+                            ImportRowResult.builder()
+                                    .rowNumber(rowNumber)
+                                    .status(ImportStatus.VALID)
+                                    .message("Expense imported successfully")
+                                    .build()
+                    );
+
+                } catch (Exception e) {
+
+                    results.add(
+                            ImportRowResult.builder()
+                                    .rowNumber(rowNumber)
+                                    .status(ImportStatus.ERROR)
+                                    .message("Failed to import row")
+                                    .build()
+                    );
+                }
 
                 rowNumber++;
             }
