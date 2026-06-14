@@ -33,4 +33,15 @@ public class GroupController {
 
         return "Member added successfully";
     }
+
+    @DeleteMapping("/{groupId}/members/{userId}")
+    public String removeMember(
+            @PathVariable Long groupId,
+            @PathVariable Long userId
+    ) {
+
+        groupService.removeMember(groupId, userId);
+
+        return "Member removed successfully";
+    }
 }

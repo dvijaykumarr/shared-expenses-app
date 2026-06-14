@@ -8,4 +8,5 @@ public interface GroupService {
 
     GroupResponse createGroup(GroupRequest request);
     void addMember(Long groupId, AddMemberRequest request);
+    void removeMember(Long groupId, Long userId);
 }

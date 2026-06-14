@@ -91,4 +91,29 @@ public class GroupServiceImpl implements GroupService {
 
         groupMemberRepository.save(groupMember);
     }
+
+    @Override
+    @Transactional
+    public void removeMember(
+            Long groupId,
+            Long userId
+    ) {
+
+        GroupMember groupMember =
+                groupMemberRepository
+                        .findByGroupIdAndUserIdAndActiveTrue(
+                                groupId,
+                                userId
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Active group membership not found"
+                                ));
+
+        groupMember.setActive(false);
+
+        groupMember.setLeftAt(LocalDate.now());
+
+        groupMemberRepository.save(groupMember);
+    }
 }
