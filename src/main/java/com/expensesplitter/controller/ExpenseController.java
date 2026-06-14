@@ -1,10 +1,13 @@
 package com.expensesplitter.controller;
 
 import com.expensesplitter.request.CreateExpenseRequest;
+import com.expensesplitter.response.BalanceResponse;
 import com.expensesplitter.response.ExpenseResponse;
 import com.expensesplitter.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -19,5 +22,13 @@ public class ExpenseController {
     ) {
 
         return expenseService.createExpense(request);
+    }
+
+    @GetMapping("/groups/{groupId}/balances")
+    public List<BalanceResponse> getGroupBalances(
+            @PathVariable Long groupId
+    ) {
+
+        return expenseService.getGroupBalances(groupId);
     }
 }

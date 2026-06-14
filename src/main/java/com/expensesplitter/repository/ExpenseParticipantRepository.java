@@ -3,6 +3,8 @@ package com.expensesplitter.repository;
 import com.expensesplitter.model.ExpenseParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ExpenseParticipantRepository
-        extends JpaRepository<ExpenseParticipant, Long> {
+import java.util.List;
+
+public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParticipant, Long> {
+    List<ExpenseParticipant> findByExpenseId(Long expenseId);
 }

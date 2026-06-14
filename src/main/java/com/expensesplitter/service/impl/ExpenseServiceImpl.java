@@ -4,6 +4,7 @@ import com.expensesplitter.mapper.ExpenseMapper;
 import com.expensesplitter.model.*;
 import com.expensesplitter.repository.*;
 import com.expensesplitter.request.CreateExpenseRequest;
+import com.expensesplitter.response.BalanceResponse;
 import com.expensesplitter.response.ExpenseResponse;
 import com.expensesplitter.service.ExpenseService;
 import jakarta.transaction.Transactional;
@@ -12,6 +13,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -82,5 +87,82 @@ public class ExpenseServiceImpl implements ExpenseService {
         }
 
         return expenseMapper.toResponse(savedExpense);
+    }
+
+    @Override
+    public List<BalanceResponse> getGroupBalances(
+            Long groupId
+    ) {
+
+        List<Expense> expenses =
+                expenseRepository.findByGroupId(groupId);
+
+        Map<Long, BigDecimal> balances =
+                new HashMap<>();
+
+        Map<Long, String> userNames =
+                new HashMap<>();
+
+        for (Expense expense : expenses) {
+
+            Long paidById =
+                    expense.getPaidBy().getId();
+
+            balances.put(
+                    paidById,
+                    balances.getOrDefault(
+                            paidById,
+                            BigDecimal.ZERO
+                    ).add(expense.getNormalizedAmount())
+            );
+
+            userNames.put(
+                    paidById,
+                    expense.getPaidBy().getName()
+            );
+
+            List<ExpenseParticipant> participants =
+                    participantRepository.findByExpenseId(
+                            expense.getId()
+                    );
+
+            for (ExpenseParticipant participant : participants) {
+
+                Long userId =
+                        participant.getUser().getId();
+
+                balances.put(
+                        userId,
+                        balances.getOrDefault(
+                                userId,
+                                BigDecimal.ZERO
+                        ).subtract(
+                                participant.getShareAmount()
+                        )
+                );
+
+                userNames.put(
+                        userId,
+                        participant.getUser().getName()
+                );
+            }
+        }
+
+        List<BalanceResponse> responses =
+                new ArrayList<>();
+
+        for (Map.Entry<Long, BigDecimal> entry
+                : balances.entrySet()) {
+
+            responses.add(
+                    new BalanceResponse(
+                            entry.getKey(),
+                            userNames.get(entry.getKey()),
+                            entry.getValue()
+                    )
+            );
+        }
+
+        return responses;
     }
 }
